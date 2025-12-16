@@ -1,0 +1,76 @@
+openapi: 3.1.1
+info:
+  title: VotingService API
+  description: API for voting 
+  version: 0.1.0
+
+servers:
+  - url: http://voting-dev.ltu-m7011e-2.se/api/voting-service
+
+paths:
+  /polls/:
+    post:
+      summary: Create a new poll.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePollRequest"
+      responses:
+        "200":
+          description: Role successfully added.
+  /polls/{poll_uuid}/vote:
+    post:
+      summary: Vote on a vote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddVoteRequest"
+components:
+  schemas:
+    CreatePollRequest:
+      type: object
+      required:
+        - vote
+      properties:
+        vote:
+          $ref: "#/components/schemas/Poll"
+
+    Poll:
+      type: object
+      description: A thing to vote on
+      properties:
+        meeting_id: 
+          type: string
+        pollType:
+          $ref: "#/components/schemas/PollType"
+        options:
+          type: array
+          items:
+            type: string
+          example: ["true", "false"]
+
+    AddVoteRequest:
+      type: object
+      required:
+        - vote
+      properties:
+        vote:
+          $ref: "#/components/schemas/Vote"
+
+    Vote:
+      type: object
+      properties:
+        selected: 
+          type: array
+          items:
+            type: string
+
+    PollType:
+      type: string
+      description: The type of poll
+      example: "single"
+      enum: [ "single", "ranked" ]
