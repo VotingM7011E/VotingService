@@ -29,6 +29,25 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/AddVoteRequest"
+    get:
+      summary: Get vote count information
+      responses:
+        "200":
+          description: Successfully fetched vote count information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteCount"
+  /polls/{poll_uuid}/:
+    get:
+      summary: Get poll information
+      responses:
+        "200":
+          description: Successfully fetched poll information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Poll"
 components:
   schemas:
     CreatePollRequest:
@@ -52,6 +71,19 @@ components:
           items:
             type: string
           example: ["true", "false"]
+
+    VoteCount:
+      type: object
+      description: Shows count of votes
+      properties:
+        eligible_voters: 
+          type: integer
+          example: 20
+        votes:
+          type: object
+          additionalProperties:
+            type: string
+          example: {"true": 10, "false": 5}
 
     AddVoteRequest:
       type: object
