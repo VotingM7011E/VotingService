@@ -5,7 +5,6 @@ CREATE TABLE polls (
     meeting_id VARCHAR(255) NOT NULL,
     poll_type VARCHAR(50) NOT NULL CHECK (poll_type IN ('single', 'ranked')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Table to store poll options

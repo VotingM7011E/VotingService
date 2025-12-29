@@ -1,16 +1,22 @@
-from flask import Flask, request, jsonify, make_response, render_template
-from flask import Blueprint
-
-from flask_pymongo import PyMongo
-from keycloak_auth import keycloak_protect
 import os
 import uuid
 import random
+
+from flask import Flask, request, jsonify, make_response, render_template
+from flask import Blueprint
+
+from keycloak_auth import keycloak_protect
+from models import Base, Poll, PollOption, Vote, VoteSelection
+
+db = SQLAlchemy(model_class=Base)
 
 blueprint = Blueprint('blueprint', __name__)
 
 app = Flask(__name__)
 
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URI")
+
+db.init_app(app)
 
 @blueprint.after_request 
 def after_request(response):
@@ -24,7 +30,9 @@ def after_request(response):
 # Root health check (for Kubernetes)
 @blueprint.get("/")
 def root():
-    return "VotingService API running"
+    polls = db.session.execute(db.select(Poll))
+    poll_count = len(polls)
+    return "VotingService API running\n Poll count: {poll_count}"
 
 @blueprint.route("/private")
 @keycloak_protect
@@ -39,6 +47,9 @@ def public():
     return {"message": "Public route"}
 
 app.register_blueprint(blueprint)
+
+with app.app_context():
+    db.create_all()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)

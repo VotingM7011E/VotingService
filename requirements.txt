@@ -1,5 +1,6 @@
 flask
-flask-pymongo
 python-jose 
 requests 
 cachetools
+flask-sqlalchemy
+psycopg2-binary
