@@ -4,6 +4,7 @@ import random
 
 from flask import Flask, request, jsonify, make_response, render_template
 from flask import Blueprint
+from flask_sqlalchemy import SQLAlchemy
 
 from keycloak_auth import keycloak_protect
 from models import Base, Poll, PollOption, Vote, VoteSelection
