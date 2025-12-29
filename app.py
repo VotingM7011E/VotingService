@@ -31,8 +31,7 @@ def after_request(response):
 # Root health check (for Kubernetes)
 @blueprint.get("/")
 def root():
-    polls = db.session.execute(db.select(Poll)).scalars()
-    poll_count = len(polls)
+    poll_count = db.session.query(Poll).count()
     return "VotingService API running\n Poll count: {poll_count}"
 
 @blueprint.route("/private")
