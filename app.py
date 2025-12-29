@@ -32,7 +32,7 @@ def after_request(response):
 @blueprint.get("/")
 def root():
     poll_count = db.session.query(Poll).count()
-    return "VotingService API running\n Poll count: {poll_count}"
+    return "VotingService API running\n Poll count: {poll_count}".format(poll_count = poll_count)
 
 @blueprint.route("/private")
 @keycloak_protect
