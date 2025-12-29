@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response,render_template
+from flask import Flask, request, jsonify, make_response, render_template
 from flask import Blueprint
 
 from flask_pymongo import PyMongo
@@ -11,12 +11,22 @@ blueprint = Blueprint('blueprint', __name__)
 
 app = Flask(__name__)
 
+
+@blueprint.after_request 
+def after_request(response):
+    header = response.headers
+    header['Access-Control-Allow-Origin'] = '*'
+    header['Access-Control-Allow-Headers'] = "*"
+    header['Access-Control-Allow-Methods'] = "*"
+    # Other headers can be added here if needed
+    return response
+
 # Root health check (for Kubernetes)
-@app.get("/")
+@blueprint.get("/")
 def root():
     return "VotingService API running"
 
-@app.route("/private")
+@blueprint.route("/private")
 @keycloak_protect
 def private():
     return jsonify({
@@ -24,7 +34,7 @@ def private():
         "user": request.user
     })
 
-@app.route("/public")
+@blueprint.route("/public")
 def public():
     return {"message": "Public route"}
 
