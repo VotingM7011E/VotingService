@@ -22,7 +22,7 @@ paths:
           description: Role successfully added.
   /polls/{poll_uuid}/vote:
     post:
-      summary: Vote on a vote
+      summary: Vote on a poll
       requestBody:
         required: true
         content:
