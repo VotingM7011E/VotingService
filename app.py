@@ -36,6 +36,7 @@ def root():
 
 # POST /polls/ - Create a new poll
 # Should be moved to consume RabbitMQ messages.
+# Should also verify meeting_uuid so it always matches an existing meeting
 @blueprint.route("/polls/", methods=["POST"])
 def create_poll():
     data = request.get_json()
@@ -88,6 +89,7 @@ def create_poll():
 
 # GET /polls/{poll_uuid}/ - Get poll information
 @blueprint.route("/polls/<poll_uuid>/", methods=["GET"])
+@keycloak_protect
 def get_poll(poll_uuid):
     try:
         poll_uuid_obj = uuid.UUID(poll_uuid)
@@ -99,6 +101,13 @@ def get_poll(poll_uuid):
     if not poll: 
         return jsonify({"error": "Poll not found"}), 404
     
+    user_id = request.user.preferred_username
+    if not user_id: 
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not check_role(request.user, poll.meeting_id, "view"):
+        return jsonify({"error": "Forbidden"}), 403
+
     # Get poll options ordered by option_order
     options = db.session.query(PollOption).filter(
         PollOption.poll_id == poll.id
@@ -114,8 +123,9 @@ def get_poll(poll_uuid):
 
 
 # POST /polls/{poll_uuid}/vote - Vote on a poll
-# TODO: Add keycloak verification of username and voting permission
+# Probably out of scope but should votes be anonymized?
 @blueprint.route("/polls/<poll_uuid>/vote", methods=["POST"])
+@keycloak_protect
 def add_vote(poll_uuid):
     try:
         poll_uuid_obj = uuid.UUID(poll_uuid)
@@ -128,7 +138,6 @@ def add_vote(poll_uuid):
         return jsonify({"error":  "Poll not found"}), 404
     
     data = request.get_json()
-    
     if not data or "vote" not in data: 
         return jsonify({"error": "Missing 'vote' in request body"}), 400
     
@@ -138,26 +147,13 @@ def add_vote(poll_uuid):
     if not selected: 
         return jsonify({"error": "No options selected"}), 400
     
-    # Get user_id from request (could come from auth header or request body)
-    # For now, we'll expect it in the request or generate one
-    user_id = vote_data.get("user_id") #TODO: yeeta denna rad, endast keycloak
-    if not user_id:
-        # Try to get from auth header if available
-        auth_header = request.headers.get("Authorization")
-        if auth_header:
-            try:
-                from keycloak_auth import verify_token
-                parts = auth_header.split()
-                if len(parts) == 2:
-                    token = parts[1]
-                    user_info = verify_token(token)
-                    user_id = user_info.get("sub")
-            except:
-                pass
-        
-        if not user_id: 
-            return jsonify({"error": "Missing 'user_id'"}), 400
-    
+    user_id = request.user.preferred_username
+    if not user_id: 
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not check_role(request.user, poll.meeting_id, "vote"):
+        return jsonify({"error": "Forbidden"}), 403
+
     # Get valid poll options
     poll_options = db.session.query(PollOption).filter(
         PollOption.poll_id == poll.id
@@ -173,6 +169,8 @@ def add_vote(poll_uuid):
     if poll.poll_type == "single" and len(selected) > 1:
         return jsonify({"error": "Single choice poll allows only one selection"}), 400
     
+    # TODO: Verify so that for ranked votes you need to rank all options
+
     # Check if user already voted
     existing_vote = db.session.query(Vote).filter(
         Vote.poll_id == poll.id,
@@ -208,8 +206,8 @@ def add_vote(poll_uuid):
 
 
 # GET /polls/{poll_uuid}/vote - Get vote count information
-# TODO: only allowed for manager role?
 @blueprint.route("/polls/<poll_uuid>/vote", methods=["GET"])
+@keycloak_protect
 def get_vote_count(poll_uuid):
     try: 
         poll_uuid_obj = uuid.UUID(poll_uuid)
@@ -221,6 +219,13 @@ def get_vote_count(poll_uuid):
     if not poll:
         return jsonify({"error": "Poll not found"}), 404
     
+    user_id = request.user.preferred_username
+    if not user_id: 
+        return jsonify({"error": "Unauthorized'"}), 401
+
+    if not check_role(request.user, poll.meeting_id, "vote"):
+        return jsonify({"error": "Forbidden"}), 403
+
     # Get all poll options
     poll_options = db.session.query(PollOption).filter(
         PollOption.poll_id == poll.id
@@ -243,6 +248,7 @@ def get_vote_count(poll_uuid):
         votes[option.option_value] = count
     
     # Get total number of voters (unique users who voted)
+    # TODO: this is wrong and needs to be checked with permissionservice.
     eligible_voters = db.session.query(Vote).filter(
         Vote.poll_id == poll.id
     ).count()

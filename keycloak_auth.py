@@ -75,3 +75,7 @@ def keycloak_protect(f):
 
     wrapper.__name__ = f.__name__
     return wrapper
+
+def check_role(user, meeting_uuid, role):
+    role_string = format("z-{}-{}", meeting_uuid, role)
+    return role_string in user.realm_access.roles
