@@ -259,18 +259,6 @@ def get_vote_count(poll_uuid):
         "votes": votes
     }), 200
 
-# @blueprint.route("/private")
-# @keycloak_protect
-# def private():
-#     return jsonify({
-#         "message": "Protected route",
-#         "user": request.user
-#     })
-# 
-# @blueprint.route("/public")
-# def public():
-#     return {"message": "Public route"}
-
 app.register_blueprint(blueprint)
 
 with app.app_context():
