@@ -39,6 +39,7 @@ jobs:
               - 'app.py'
               - 'models.py'
               - 'keycloak_auth.py'
+              - 'mq.py'
               - '.github/workflows/**'
 
       - name: Stop early if no build needed

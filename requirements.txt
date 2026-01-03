@@ -4,3 +4,4 @@ requests
 cachetools
 flask-sqlalchemy
 psycopg2-binary
+pika

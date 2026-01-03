@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from keycloak_auth import keycloak_protect, check_role
 from models import Base, Poll, PollOption, Vote, VoteSelection
+from mq import start_consumer
 
 db = SQLAlchemy(model_class=Base)
 
@@ -34,58 +35,58 @@ def root():
     poll_count = db.session.query(Poll).count()
     return "VotingService API running\n Poll count: {poll_count}".format(poll_count = poll_count)
 
-# POST /polls/ - Create a new poll
-# Should be moved to consume RabbitMQ messages.
-# Should also verify meeting_uuid so it always matches an existing meeting
-@blueprint.route("/polls/", methods=["POST"])
-def create_poll():
-    data = request.get_json()
-    
-    if not data or "vote" not in data: 
-        return jsonify({"error": "Missing 'vote' in request body"}), 400
-    
-    vote_data = data["vote"]
-    
+def on_event(event: dict):
+    # event envelope: {event_type, data, ...}
+    et = event.get("event_type")
+    data = event.get("data", {})
+
+    if et == "voting.create":
+        # IMPORTANT: we need app context for db.session
+        with app.app_context():
+            # expected payload: {"vote": {...}} OR just vote_data
+            vote_data = data.get("vote") or data
+            create_poll_from_vote_data(vote_data)
+
+# Start consumer thread (after app exists)
+start_consumer(
+    queue=os.getenv("MQ_QUEUE", "voting-service"),
+    bindings=os.getenv("MQ_BINDINGS", "voting.create").split(","),
+    on_event=on_event,
+)
+
+# TODO: Should also verify meeting_uuid so it always matches an existing meeting
+def create_poll_from_vote_data(vote_data: dict):
     # Validate required fields
     meeting_id = vote_data.get("meeting_id")
     poll_type = vote_data.get("pollType")
     options = vote_data.get("options", [])
-    
-    if not meeting_id: 
-        return jsonify({"error": "Missing 'meeting_id'"}), 400
-    
+
+    if not meeting_id:
+        raise ValueError("Missing 'meeting_id'")
     if poll_type not in ["single", "ranked"]:
-        return jsonify({"error": "Invalid 'pollType'. Must be 'single' or 'ranked'"}), 400
-    
+        raise ValueError("Invalid 'pollType'. Must be 'single' or 'ranked'")
     if not options or len(options) < 2:
-        return jsonify({"error": "At least 2 options are required"}), 400
-    
-    # Create the poll
-    poll = Poll(
-        meeting_id=meeting_id,
-        poll_type=poll_type
-    )
+        raise ValueError("At least 2 options are required")
+
+    poll = Poll(meeting_id=meeting_id, poll_type=poll_type)
     db.session.add(poll)
-    db.session.flush()  # Get the poll ID
-    
-    # Create poll options
+    db.session.flush()  # get poll.id
+
     for index, option_value in enumerate(options):
-        poll_option = PollOption(
+        db.session.add(PollOption(
             poll_id=poll.id,
             option_value=option_value,
-            option_order=index
-        )
-        db.session.add(poll_option)
-    
+            option_order=index,
+        ))
+
     db.session.commit()
-    
-    return jsonify({
+
+    return {
         "uuid": str(poll.uuid),
         "meeting_id": poll.meeting_id,
         "pollType": poll.poll_type,
-        "options": options
-    }), 200
-
+        "options": options,
+    }
 
 # GET /polls/{poll_uuid}/ - Get poll information
 @blueprint.route("/polls/<poll_uuid>/", methods=["GET"])
