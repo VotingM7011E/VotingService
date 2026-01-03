@@ -102,7 +102,7 @@ def get_poll(poll_uuid):
     if not poll: 
         return jsonify({"error": "Poll not found"}), 404
     
-    user_id = request.user.preferred_username
+    user_id = request.user["preferred_username"]
     if not user_id: 
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -148,7 +148,7 @@ def add_vote(poll_uuid):
     if not selected: 
         return jsonify({"error": "No options selected"}), 400
     
-    user_id = request.user.preferred_username
+    user_id = request.user["preferred_username"]
     if not user_id: 
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -220,7 +220,7 @@ def get_vote_count(poll_uuid):
     if not poll:
         return jsonify({"error": "Poll not found"}), 404
     
-    user_id = request.user.preferred_username
+    user_id = request.user["preferred_username"]
     if not user_id: 
         return jsonify({"error": "Unauthorized'"}), 401
 
