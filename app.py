@@ -65,8 +65,7 @@ def create_poll_from_vote_data(vote_data: dict):
 
     if not meeting_id:
         raise ValueError("Missing 'meeting_id'")
-    if not poll_id:
-        raise ValueError("Missing 'poll_id'")
+    # poll_id is optional. If provided, we'll use it as the DB id, otherwise let the DB assign one.
     if poll_type not in ["single", "ranked"]:
         raise ValueError("Invalid 'pollType'. Must be 'single' or 'ranked'")
     if not options or len(options) < 2:
@@ -100,6 +99,19 @@ def create_poll_from_vote_data(vote_data: dict):
         ))
 
     db.session.commit()
+
+    # Publish a created event so originator (e.g., MotionService) can correlate
+    try:
+        event_data = {
+            "poll_uuid": str(poll.uuid),
+            "poll_id": getattr(poll, "id", None),
+            "meeting_id": poll.meeting_id,
+            "origin": vote_data.get("origin"),
+        }
+        publish_event("voting.created", event_data)
+    except Exception:
+        # best-effort publish
+        pass
 
     return {
         "uuid": str(poll.uuid),
