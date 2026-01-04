@@ -58,23 +58,25 @@ start_consumer(
 def create_poll_from_vote_data(vote_data: dict):
     # Validate required fields
     meeting_id = vote_data.get("meeting_id")
+    poll_id = vote_data.get("poll_id")
     poll_type = vote_data.get("pollType")
     options = vote_data.get("options", [])
 
     if not meeting_id:
         raise ValueError("Missing 'meeting_id'")
+    if not poll_id:
+        raise ValueError("Missing 'poll_id'")
     if poll_type not in ["single", "ranked"]:
         raise ValueError("Invalid 'pollType'. Must be 'single' or 'ranked'")
     if not options or len(options) < 2:
         raise ValueError("At least 2 options are required")
 
-    poll = Poll(meeting_id=meeting_id, poll_type=poll_type)
+    poll = Poll(id=poll_id, meeting_id=meeting_id, poll_type=poll_type)
     db.session.add(poll)
-    db.session.flush()  # get poll.id
 
     for index, option_value in enumerate(options):
         db.session.add(PollOption(
-            poll_id=poll.id,
+            poll_id=poll_id,
             option_value=option_value,
             option_order=index,
         ))
