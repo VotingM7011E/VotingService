@@ -44,9 +44,16 @@ def on_event(event: dict):
     if et == "voting.create":
         # IMPORTANT: we need app context for db.session
         with app.app_context():
-            # expected payload: {"vote": {...}} OR just vote_data
-            vote_data = data.get("vote") or data
-            create_poll_from_vote_data(vote_data)
+            try:
+                # expected payload: {"vote": {...}} OR just vote_data
+                vote_data = data.get("vote") or data
+                print(f"📥 Received voting.create event with data: {vote_data}")
+                result = create_poll_from_vote_data(vote_data)
+                print(f"✅ Successfully created poll: {result}")
+            except Exception as e:
+                print(f"❌ Failed to create poll from vote data: {e}")
+                import traceback
+                traceback.print_exc()
 
 # Start consumer thread (after app exists)
 start_consumer(
