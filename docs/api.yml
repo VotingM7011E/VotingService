@@ -8,18 +8,6 @@ servers:
   - url: http://voting-dev.ltu-m7011e-2.se/api/voting-service
 
 paths:
-  /polls/:
-    post:
-      summary: Create a new poll.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreatePollRequest"
-      responses:
-        "200":
-          description: Role successfully added.
   /polls/{poll_uuid}/vote:
     post:
       summary: Vote on a poll

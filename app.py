@@ -1,6 +1,7 @@
 import os
 import uuid
 import random
+import requests
 
 from flask import Flask, request, jsonify, make_response, render_template
 from flask import Blueprint
@@ -8,7 +9,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 from keycloak_auth import keycloak_protect, check_role
 from models import Base, Poll, PollOption, Vote, VoteSelection
-from mq import start_consumer
+from mq import start_consumer, publish_event
 
 db = SQLAlchemy(model_class=Base)
 
@@ -71,7 +72,24 @@ def create_poll_from_vote_data(vote_data: dict):
     if not options or len(options) < 2:
         raise ValueError("At least 2 options are required")
 
-    poll = Poll(id=poll_id, meeting_id=meeting_id, poll_type=poll_type)
+    # Determine expected_voters: prefer provided value, otherwise ask PermissionService
+    expected_voters = vote_data.get("expected_voters")
+    if expected_voters is None:
+        try:
+            permission_base = os.getenv(
+                "PERMISSION_SERVICE_URL",
+                "http://permission-service.permission-service-dev.svc.cluster.local",
+            )
+            url = f"{permission_base}/meetings/{meeting_id}/roles/vote/users"
+            resp = requests.get(url, timeout=5)
+            resp.raise_for_status()
+            users = resp.json()
+            if isinstance(users, list):
+                expected_voters = len(users)
+        except requests.exceptions.RequestException:
+            expected_voters = None
+
+    poll = Poll(id=poll_id, meeting_id=meeting_id, poll_type=poll_type, expected_voters=expected_voters)
     db.session.add(poll)
 
     for index, option_value in enumerate(options):
@@ -204,7 +222,49 @@ def add_vote(poll_uuid):
         db.session.add(vote_selection)
     
     db.session.commit()
-    
+    # After committing the vote, check if poll is complete and notify creator via MQ
+    try:
+        total_votes = db.session.query(Vote).filter(Vote.poll_id == poll.id).count()
+        expected = getattr(poll, "expected_voters", None)
+
+        if expected is not None and total_votes >= expected and not getattr(poll, "completed", False):
+            # mark completed and persist
+            poll.completed = True
+            db.session.add(poll)
+            db.session.commit()
+
+            # build simple results summary
+            poll_options = db.session.query(PollOption).filter(PollOption.poll_id == poll.id).all()
+            results = {}
+            for option in poll_options:
+                if poll.poll_type == "single":
+                    count = db.session.query(VoteSelection).filter(
+                        VoteSelection.poll_option_id == option.id
+                    ).count()
+                else:
+                    count = db.session.query(VoteSelection).filter(
+                        VoteSelection.poll_option_id == option.id,
+                        VoteSelection.rank_order == 1
+                    ).count()
+                results[option.option_value] = count
+
+            event_data = {
+                "poll_id": str(poll.uuid),
+                "meeting_id": poll.meeting_id,
+                "results": results,
+                "total_votes": total_votes,
+            }
+
+            try:
+                publish_event("voting.completed", event_data)
+            except Exception:
+                # best-effort publish; don't fail the request
+                pass
+
+    except Exception:
+        # If anything goes wrong while checking/completing, ignore to not break voting
+        pass
+
     return jsonify({"message": "Vote recorded successfully"}), 200
 
 
@@ -250,11 +310,27 @@ def get_vote_count(poll_uuid):
             ).count()
         votes[option.option_value] = count
     
-    # Get total number of voters (unique users who voted)
-    # TODO: this is wrong and needs to be checked with permissionservice.
-    eligible_voters = db.session.query(Vote).filter(
-        Vote.poll_id == poll.id
-    ).count()
+    # Get eligible voters from permission-service (role="vote").
+    # If the permission service is unavailable, fall back to counting
+    # already cast votes to avoid failing the endpoint.
+    try:
+        permission_base = os.getenv(
+            "PERMISSION_SERVICE_URL",
+            "http://permission-service.permission-service-dev.svc.cluster.local",
+        )
+        url = f"{permission_base}/meetings/{poll.meeting_id}/roles/vote/users"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        users = resp.json()
+        if isinstance(users, list):
+            eligible_voters = len(users)
+        else:
+            eligible_voters = 0
+    except requests.exceptions.RequestException:
+        # Graceful fallback: count unique users who have already voted
+        eligible_voters = db.session.query(Vote).filter(
+            Vote.poll_id == poll.id
+        ).count()
     
     return jsonify({
         "eligible_voters": eligible_voters,

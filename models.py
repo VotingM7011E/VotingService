@@ -14,6 +14,10 @@ class Poll(Base):
     uuid = Column(UUID(as_uuid=True), unique=True, nullable=False, server_default=text("gen_random_uuid()"))
     meeting_id = Column(String(255), nullable=False)
     poll_type = Column(String(50), nullable=False)
+    # Number of eligible voters when the poll was created. May be null if unknown.
+    expected_voters = Column(Integer, nullable=True)
+    # Whether the poll has been completed and notification sent.
+    completed = Column(sqlalchemy.Boolean, nullable=False, server_default=text("false"))
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp())
 
     __table_args__ = (
