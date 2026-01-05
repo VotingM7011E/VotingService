@@ -169,6 +169,14 @@ def get_poll(poll_uuid):
 @blueprint.route("/polls/<poll_uuid>/vote", methods=["POST"])
 @keycloak_protect
 def add_vote(poll_uuid):
+    # Expects 
+    # data = {
+    #  "vote": [
+    #     "option1",
+    #     "option2"
+    #   ]
+    # }
+    
     try:
         poll_uuid_obj = uuid.UUID(poll_uuid)
     except ValueError:
@@ -183,8 +191,7 @@ def add_vote(poll_uuid):
     if not data or "vote" not in data: 
         return jsonify({"error": "Missing 'vote' in request body"}), 400
     
-    vote_data = data["vote"]
-    selected = vote_data.get("selected", [])
+    selected = data.get("vote", [])
     
     if not selected: 
         return jsonify({"error": "No options selected"}), 400
@@ -293,6 +300,7 @@ def add_vote(poll_uuid):
 @blueprint.route("/polls/<poll_uuid>/vote", methods=["GET"])
 @keycloak_protect
 def get_vote_count(poll_uuid):
+
     try: 
         poll_uuid_obj = uuid.UUID(poll_uuid)
     except ValueError: 
