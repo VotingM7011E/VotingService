@@ -97,10 +97,12 @@ def create_poll_from_vote_data(vote_data: dict):
 
     poll = Poll(id=poll_id, meeting_id=meeting_id, poll_type=poll_type, expected_voters=expected_voters)
     db.session.add(poll)
-
+    db.session.flush()  # Flush to get the auto-generated poll.id
+    
+    # Now poll.id is available (either provided or auto-generated)
     for index, option_value in enumerate(options):
         db.session.add(PollOption(
-            poll_id=poll_id,
+            poll_id=poll.id,  # Use poll.id instead of poll_id variable
             option_value=option_value,
             option_order=index,
         ))
