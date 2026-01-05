@@ -295,9 +295,37 @@ def add_vote(poll_uuid):
 
     return jsonify({"message": "Vote recorded successfully"}), 200
 
-
-# GET /polls/{poll_uuid}/vote - Get vote count information
+# GET /polls/{poll_uuid}/vote - Check whether the authenticated user has voted
 @blueprint.route("/polls/<poll_uuid>/vote", methods=["GET"])
+@keycloak_protect
+def has_voted(poll_uuid):
+
+    try:
+        poll_uuid_obj = uuid.UUID(poll_uuid)
+    except ValueError:
+        return jsonify({"error": "Invalid poll UUID"}), 400
+
+    poll = db.session.query(Poll).filter(Poll.uuid == poll_uuid_obj).first()
+    if not poll:
+        return jsonify({"error": "Poll not found"}), 404
+
+    user_id = request.user["preferred_username"]
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if not check_role(request.user, poll.meeting_id, "vote"):
+        return jsonify({"error": "Forbidden"}), 403
+
+    existing_vote = db.session.query(Vote).filter(
+        Vote.poll_id == poll.id,
+        Vote.user_id == user_id
+    ).first()
+
+    return jsonify({"has_voted": existing_vote is not None}), 200
+
+
+# GET /polls/{poll_uuid}/votes - Get vote count information
+@blueprint.route("/polls/<poll_uuid>/votes", methods=["GET"])
 @keycloak_protect
 def get_vote_count(poll_uuid):
 

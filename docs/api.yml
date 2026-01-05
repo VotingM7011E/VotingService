@@ -18,6 +18,19 @@ paths:
             schema:
               $ref: "#/components/schemas/AddVoteRequest"
     get:
+      summary: Get if you have voted on a poll
+      responses:
+        "200":
+          description: Successfully retrieved if you have voted on a poll
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_voted:
+                    type: boolean
+  /polls/{poll_uuid}/votes:
+    get:
       summary: Get vote count information
       responses:
         "200":
