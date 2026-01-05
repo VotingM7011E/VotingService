@@ -254,9 +254,10 @@ def add_vote(poll_uuid):
     try:
         total_votes = db.session.query(Vote).filter(Vote.poll_id == poll.id).count()
         expected = getattr(poll, "expected_voters", None)
-
+        print(f"Total votes: {total_votes}, Expected: {expected}")
         if expected is not None and total_votes >= expected and not getattr(poll, "completed", False):
             # mark completed and persist
+            print(f"Poll {poll.uuid} completed with {total_votes} votes.")
             poll.completed = True
             db.session.add(poll)
             db.session.commit()
@@ -282,7 +283,7 @@ def add_vote(poll_uuid):
                 "results": results,
                 "total_votes": total_votes,
             }
-
+            print(f"Publishing voting.completed event: {event_data}")
             try:
                 publish_event("voting.completed", event_data)
             except Exception:
