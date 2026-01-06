@@ -95,7 +95,7 @@ def create_poll_from_vote_data(vote_data: dict):
         except requests.exceptions.RequestException:
             expected_voters = None
     print(f"Expected voters for poll (meeting_id={meeting_id}): {expected_voters}")
-    poll = Poll(id=poll_id, meeting_id=meeting_id, poll_type=poll_type, expected_voters=expected_voters)
+    poll = Poll(uuid=poll_id, meeting_id=meeting_id, poll_type=poll_type, expected_voters=expected_voters)
     db.session.add(poll)
     db.session.flush()  # Flush to get the auto-generated poll.id
     
